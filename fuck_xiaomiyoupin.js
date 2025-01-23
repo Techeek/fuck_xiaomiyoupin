@@ -12,8 +12,9 @@
     'use strict';
 
     // 定义 Bark 通知的默认变量
-    const DEFAULT_BARK_TITLE = encodeURIComponent("小米有品客服通知"); // 默认通知标题
-    const DEFAULT_BARK_DEVICE_KEY = "123456789"; // 默认设备密钥
+    const DEFAULT_BARK_TITLE = encodeURIComponent("小米有品客服通知"); // Bark通知标题
+    const DEFAULT_BARK_DEVICE_KEY = "123456789"; // Bark密钥，下载Bark后自动获取
+    const DEFAULT_REPLY_CONTENT = "您好，请问有什么可以帮您？"; // 默认回复内容
 
     // 等待页面加载完成
     function waitForElement(selector, callback) {
@@ -86,7 +87,7 @@
                                 roomId: message.body.roomId,
                                 userId: message.body.toUserId,
                                 connectionId: message.body.toUserConnectionId,
-                                content: "亲亲，请稍等哈！",
+                                content: DEFAULT_REPLY_CONTENT, 
                                 msgType: "TEXT",
                                 umsgId: `KF|${Date.now()}`,
                                 extraInfo: "{}",

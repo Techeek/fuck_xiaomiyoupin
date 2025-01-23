@@ -7,3 +7,12 @@
 - [x] Bark消息推送（解决IOS无法接收消息问题）
 - [x] 开关（用于连续消息解答问题）
 - [ ] 对接deepseek自动回复
+
+## 使用
+修改下面内容为你需要的内容
+
+```javascript
+const DEFAULT_BARK_TITLE = encodeURIComponent("小米有品客服通知"); // Bark通知标题
+const DEFAULT_BARK_DEVICE_KEY = "123456789"; // Bark密钥，下载Bark后自动获取
+const DEFAULT_REPLY_CONTENT = "您好，请问有什么可以帮您？"; // 默认回复内容
+```
