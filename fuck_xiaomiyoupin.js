@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         小米有品客服自动回复油猴脚本
 // @namespace    https://www.techeek.cn/
-// @version      1.2
+// @version      1.3
 // @description  小米有品客服平台太恶心，30S内必须回复，不然就罚款，因此写了个小工具监控并自动回复（求求小米工程师优化下有品客服工具的APP吧，2025年了，还必须一直打开APP才能看到消息，而且不支持IOS平台）。
 // @author       Techeek
 // @match        https://yp-janus.kefu.mi.com/*
@@ -11,12 +11,15 @@
 (function () {
     'use strict';
 
-    // 定义 Bark 通知的默认变量
+    // 定义常量
     const DEFAULT_BARK_TITLE = encodeURIComponent("小米有品客服通知"); // Bark通知标题
     const DEFAULT_BARK_DEVICE_KEY = "123456789"; // Bark密钥，下载Bark后自动获取
     const DEFAULT_REPLY_CONTENT = "您好，请问有什么可以帮您？"; // 默认回复内容
 
-    // 等待页面加载完成
+    // 全局状态
+    let isMonitoring = localStorage.getItem('autoreply_enabled') === 'true';
+
+    // 工具函数：等待元素加载
     function waitForElement(selector, callback) {
         const interval = setInterval(() => {
             const element = document.querySelector(selector);
@@ -27,24 +30,56 @@
         }, 100);
     }
 
-    // 添加开关按钮到指定位置
-    function addToggleButton(container) {
+    // 工具函数：发送 POST 请求
+    async function sendPostRequest(url, data) {
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            if (response.ok) {
+                console.log('POST请求成功:', await response.json());
+                return true;
+            } else {
+                console.error('POST请求失败:', response.status, response.statusText);
+                return false;
+            }
+        } catch (error) {
+            console.error('发送POST请求时出错:', error);
+            return false;
+        }
+    }
+
+    // 工具函数：发送 GET 请求
+    async function sendGetRequest(url) {
+        try {
+            const response = await fetch(url);
+            if (response.ok) {
+                console.log('GET请求成功');
+                return true;
+            } else {
+                console.error('GET请求失败:', response.status, response.statusText);
+                return false;
+            }
+        } catch (error) {
+            console.error('发送GET请求时出错:', error);
+            return false;
+        }
+    }
+
+    // 按钮相关逻辑
+    function setupToggleButton(container) {
         const toggleButton = document.createElement('button');
         toggleButton.id = 'autoreply-toggle';
         toggleButton.style.marginLeft = '10px';
         toggleButton.style.padding = '5px 10px';
-        toggleButton.style.backgroundColor = '#4CAF50';
         toggleButton.style.color = 'white';
         toggleButton.style.border = 'none';
         toggleButton.style.borderRadius = '3px';
         toggleButton.style.cursor = 'pointer';
-        toggleButton.textContent = '自动回复: 关闭';
-
-        container.appendChild(toggleButton);
-
-        // 从本地存储获取开关状态
-        let isMonitoring = localStorage.getItem('autoreply_enabled') === 'true';
-        updateButtonState();
 
         // 更新按钮状态
         function updateButtonState() {
@@ -52,14 +87,21 @@
             toggleButton.style.backgroundColor = isMonitoring ? '#4CAF50' : '#f44336';
         }
 
+        // 初始化按钮状态
+        updateButtonState();
+
         // 按钮点击事件
         toggleButton.addEventListener('click', () => {
             isMonitoring = !isMonitoring;
             localStorage.setItem('autoreply_enabled', isMonitoring);
-            updateButtonState();
+            window.location.reload(); // 点击按钮后自动刷新页面
         });
 
-        // 保存原生的 WebSocket 构造函数
+        container.appendChild(toggleButton);
+    }
+
+    // WebSocket 相关逻辑
+    function setupWebSocket() {
         const OriginalWebSocket = window.WebSocket;
 
         // 重写 WebSocket 构造函数
@@ -87,7 +129,7 @@
                                 roomId: message.body.roomId,
                                 userId: message.body.toUserId,
                                 connectionId: message.body.toUserConnectionId,
-                                content: DEFAULT_REPLY_CONTENT, 
+                                content: DEFAULT_REPLY_CONTENT,
                                 msgType: "TEXT",
                                 umsgId: `KF|${Date.now()}`,
                                 extraInfo: "{}",
@@ -95,37 +137,14 @@
                                 userTenantId: userTenantId
                             };
 
-                            // 发送 POST 请求
-                            try {
-                                const response = await fetch('https://yp-janus.kefu.mi.com/mcc/web-api/chat/send', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify(postData)
-                                });
+                            // 发送自动回复
+                            const postUrl = 'https://yp-janus.kefu.mi.com/mcc/web-api/chat/send';
+                            const postSuccess = await sendPostRequest(postUrl, postData);
 
-                                if (response.ok) {
-                                    console.log('自动回复成功:', await response.json());
-
-                                    // 自动回复成功后，通过 Bark 推送紧急消息
-                                    const barkUrl = `https://api.day.app/${DEFAULT_BARK_DEVICE_KEY}/${DEFAULT_BARK_TITLE}?level=critical&volume=5`;
-                                    fetch(barkUrl)
-                                        .then(response => {
-                                            if (response.ok) {
-                                                console.log('Bark通知发送成功');
-                                            } else {
-                                                console.error('Bark通知发送失败:', response.status, response.statusText);
-                                            }
-                                        })
-                                        .catch(error => {
-                                            console.error('发送Bark通知时出错:', error);
-                                        });
-                                } else {
-                                    console.error('自动回复失败:', response.status, response.statusText);
-                                }
-                            } catch (error) {
-                                console.error('发送自动回复时出错:', error);
+                            if (postSuccess) {
+                                // 自动回复成功后，通过 Bark 推送紧急消息
+                                const barkUrl = `https://api.day.app/${DEFAULT_BARK_DEVICE_KEY}/${DEFAULT_BARK_TITLE}?level=critical&volume=5`;
+                                await sendGetRequest(barkUrl);
                             }
                         }
                     }
@@ -141,6 +160,15 @@
         window.WebSocket.prototype = OriginalWebSocket.prototype;
     }
 
-    // 等待 <div class="home-container-headbar"> 加载完成后添加按钮
-    waitForElement('.home-container-headbar', addToggleButton);
+    // 初始化
+    function init() {
+        // 等待页面加载完成后添加按钮
+        waitForElement('.home-container-headbar', setupToggleButton);
+
+        // 设置 WebSocket 监听
+        setupWebSocket();
+    }
+
+    // 启动脚本
+    init();
 })();
