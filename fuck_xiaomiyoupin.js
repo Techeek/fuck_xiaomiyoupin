@@ -11,6 +11,10 @@
 (function () {
     'use strict';
 
+    // 定义 Bark 通知的默认变量
+    const DEFAULT_BARK_TITLE = encodeURIComponent("小米有品客服通知"); // 默认通知标题
+    const DEFAULT_BARK_DEVICE_KEY = "123456789"; // 默认设备密钥
+
     // 等待页面加载完成
     function waitForElement(selector, callback) {
         const interval = setInterval(() => {
@@ -102,6 +106,20 @@
 
                                 if (response.ok) {
                                     console.log('自动回复成功:', await response.json());
+
+                                    // 自动回复成功后，通过 Bark 推送紧急消息
+                                    const barkUrl = `https://api.day.app/${DEFAULT_BARK_DEVICE_KEY}/${DEFAULT_BARK_TITLE}?level=critical&volume=5`;
+                                    fetch(barkUrl)
+                                        .then(response => {
+                                            if (response.ok) {
+                                                console.log('Bark通知发送成功');
+                                            } else {
+                                                console.error('Bark通知发送失败:', response.status, response.statusText);
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.error('发送Bark通知时出错:', error);
+                                        });
                                 } else {
                                     console.error('自动回复失败:', response.status, response.statusText);
                                 }
